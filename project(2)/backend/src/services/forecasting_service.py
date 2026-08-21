@@ -14,11 +14,35 @@ try:
 except Exception:
     ARIMA_AVAILABLE = False
 
-try:
-    from prophet import Prophet
-    PROPHET_AVAILABLE = True
-except Exception:
-    PROPHET_AVAILABLE = False
+# Prophet (and the matplotlib/fontTools chain it pulls in) is imported lazily,
+# only the first time a Prophet forecast is actually requested. Importing it
+# eagerly at module load time can add tens of seconds (sometimes minutes on
+# Windows, due to matplotlib's font-cache scan) to every server startup and
+# every Flask debug-reloader restart, even for users who only ever use ARIMA.
+
+
+def _try_import_prophet():
+    try:
+        from prophet import Prophet
+        return Prophet
+    except Exception:
+        return None
+
+
+_PROPHET_CLASS = None
+_PROPHET_CHECKED = False
+
+
+def _get_prophet_class():
+    global _PROPHET_CLASS, _PROPHET_CHECKED
+    if not _PROPHET_CHECKED:
+        _PROPHET_CLASS = _try_import_prophet()
+        _PROPHET_CHECKED = True
+    return _PROPHET_CLASS
+
+
+def prophet_available():
+    return _get_prophet_class() is not None
 
 
 def _evaluate(y_true, y_pred):
@@ -64,11 +88,11 @@ class ForecastingService:
         train = series.iloc[:-test_size]
         test = series.iloc[-test_size:]
 
-        if model_type == "prophet" and PROPHET_AVAILABLE:
+        if model_type == "prophet" and prophet_available():
             metrics, test_pred, future_pred, future_index, bounds = self._run_prophet(
                 train, test, series, horizon, params)
         else:
-            if model_type == "prophet" and not PROPHET_AVAILABLE:
+            if model_type == "prophet" and not prophet_available():
                 model_type = "arima"  # graceful fallback
             metrics, test_pred, future_pred, future_index, bounds = self._run_arima(
                 train, test, series, horizon, params)
@@ -119,6 +143,7 @@ class ForecastingService:
         return metrics, test_pred, future_pred, future_index, bounds
 
     def _run_prophet(self, train, test, full_series, horizon, params):
+        Prophet = _get_prophet_class()
         df_train = pd.DataFrame({"ds": train.index, "y": train.values})
         m = Prophet(interval_width=0.8, daily_seasonality=True,
                     weekly_seasonality=False, yearly_seasonality=False)
@@ -144,7 +169,7 @@ class ForecastingService:
 
     def compare_models(self, version_id, segment_id, horizon=4, test_size=4):
         results = {}
-        for m in (["arima", "prophet"] if PROPHET_AVAILABLE else ["arima"]):
+        for m in (["arima", "prophet"] if prophet_available() else ["arima"]):
             try:
                 results[m] = self.run_forecast(version_id, segment_id, model_type=m,
                                                 horizon=horizon, test_size=test_size)
