@@ -13,9 +13,11 @@ class AnalysisService:
     def __init__(self, repository: DatasetRepository = None):
         self.repository = repository or DatasetRepository()
 
-    def compute_features(self, version_id, interval_minutes=15, peak_percentile=75):
+    def compute_features(self, version_id, interval_minutes=1, peak_percentile=75):
         """RQ1 + RQ2: build a traffic-density time series from trajectories,
         using a configurable temporal aggregation interval."""
+        if interval_minutes < 1:
+            raise ValidationException("interval_minutes must be at least 1")
         version = self.repository.get_version(version_id)
         if not version:
             raise NotFoundException("Dataset version not found")
