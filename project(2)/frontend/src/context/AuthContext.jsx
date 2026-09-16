@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import client from "../api/client";
-
-const AuthContext = createContext(null);
+import AuthContext from "./AuthContextValue";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -45,8 +44,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  return useContext(AuthContext);
 }
