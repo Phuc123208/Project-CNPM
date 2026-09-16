@@ -1,22 +1,24 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Loading from "./components/Loading";
 
-import AuthPage from "./pages/AuthPage";
-import DashboardPage from "./pages/DashboardPage";
-import DatasetsPage from "./pages/DatasetsPage";
-import DatasetDetailPage from "./pages/DatasetDetailPage";
-import AnalysisPage from "./pages/AnalysisPage";
-import ExperimentsPage from "./pages/ExperimentsPage";
-import ExperimentDetailPage from "./pages/ExperimentDetailPage";
-import ReportsPage from "./pages/ReportsPage";
-import UsersPage from "./pages/UsersPage";
-import AuditPage from "./pages/AuditPage";
-import ProfilePage from "./pages/ProfilePage";
+const AuthPage = lazy(() => import("./pages/AuthPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const DatasetsPage = lazy(() => import("./pages/DatasetsPage"));
+const DatasetDetailPage = lazy(() => import("./pages/DatasetDetailPage"));
+const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
+const ExperimentsPage = lazy(() => import("./pages/ExperimentsPage"));
+const ExperimentDetailPage = lazy(() => import("./pages/ExperimentDetailPage"));
+const ReportsPage = lazy(() => import("./pages/ReportsPage"));
+const UsersPage = lazy(() => import("./pages/UsersPage"));
+const AuditPage = lazy(() => import("./pages/AuditPage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<Loading />}>
+      <Routes>
       <Route path="/login" element={<AuthPage />} />
 
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
@@ -38,6 +40,7 @@ export default function App() {
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }
