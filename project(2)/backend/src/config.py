@@ -10,6 +10,8 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "a_default_secret_key")
     DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1")
     TESTING = os.environ.get("TESTING", "False").lower() in ("true", "1")
+    DB_INIT_ON_STARTUP = os.environ.get("DB_INIT_ON_STARTUP", "false").lower() in ("true", "1")
+    DB_SEED_ON_INIT = os.environ.get("DB_SEED_ON_INIT", "false").lower() in ("true", "1")
 
     # Supabase Postgres connection string
     DATABASE_URI = os.environ.get(
