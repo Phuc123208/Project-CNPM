@@ -65,10 +65,16 @@ python run.py
 # API chạy tại http://localhost:9999
 ```
 
-Lần chạy đầu tiên, hệ thống sẽ **tự động tạo toàn bộ bảng** trong Supabase
-(`users, datasets, dataset_versions, road_segments, traffic_features,
-experiments, forecast_results, reports, audit_logs`) và **seed 4 tài khoản demo**
-(mỗi role một tài khoản):
+Mặc định, khởi động server **không tự động tạo bảng hoặc seed dữ liệu**. Điều
+này giúp smoke test/khởi động ứng dụng không ghi dữ liệu lên Supabase thật.
+Nếu muốn khởi tạo schema và tài khoản demo một cách chủ động, chạy:
+
+```bash
+DB_INIT_ON_STARTUP=true DB_SEED_ON_INIT=true python run.py
+```
+
+`DB_INIT_ON_STARTUP=true` chỉ tạo các bảng còn thiếu; `DB_SEED_ON_INIT=true`
+mới seed 4 tài khoản demo (mỗi role một tài khoản):
 
 | Role       | Email                         | Password       |
 |------------|--------------------------------|----------------|
@@ -77,7 +83,10 @@ experiments, forecast_results, reports, audit_logs`) và **seed 4 tài khoản d
 | Analyst    | analyst@traffic.edu.vn        | Analyst@123    |
 | Student    | student@traffic.edu.vn        | Student@123    |
 
-Kiểm tra API: `GET http://localhost:9999/api/health` → `{"status": "ok"}`
+Kiểm tra API: `GET http://localhost:9999/api/health`. Endpoint này thực hiện
+`SELECT 1` tới database và trả HTTP 503 với
+`{"status":"error","database":"unavailable"}` nếu database không khả dụng;
+không còn trả trạng thái xanh giả.
 
 ## 3. Chạy Frontend
 
@@ -90,6 +99,42 @@ npm run dev
 
 File `frontend/.env` đã trỏ sẵn tới `http://localhost:9999/api`. Nếu deploy
 backend ở địa chỉ khác, chỉnh biến `VITE_API_URL`.
+
+## 3.1. Chạy toàn bộ bằng Docker
+
+Yêu cầu Docker Desktop đang chạy. Từ thư mục `project(2)`:
+
+```bash
+docker compose up --build
+```
+
+Mở `http://localhost:8080`. Docker Compose sẽ chạy PostgreSQL nội bộ, tạo
+schema và seed tài khoản demo trong database local; không kết nối hoặc ghi vào
+Supabase. Dữ liệu upload, báo cáo và database được giữ trong named volumes.
+
+Các biến tùy chọn:
+
+```bash
+APP_PORT=8088 POSTGRES_PASSWORD=local-password SECRET_KEY=local-secret docker compose up --build
+```
+
+Dừng hệ thống nhưng giữ dữ liệu:
+
+```bash
+docker compose down
+```
+
+Xóa cả database/uploads/reports local (không thể hoàn tác):
+
+```bash
+docker compose down -v
+```
+
+Kiểm tra trạng thái backend:
+
+```bash
+curl http://localhost:8080/api/health
+```
 
 ## 4. Thử nghiệm nhanh (demo flow)
 
@@ -127,18 +172,27 @@ Phân quyền (role-based):
 
 ## 6. Ghi chú quan trọng
 
+Tài liệu bàn giao chi tiết nằm trong thư mục `docs/`: `USER_GUIDE.md`,
+`TECHNICAL_DOCUMENTATION.md` và `API_REFERENCE.md`.
+
 - Ứng dụng đã được **kiểm thử end-to-end thực tế** (login → upload → phân tích
   → dự báo ARIMA → xuất báo cáo PDF/Excel → tải file → RBAC) bằng HTTP request
   thật trong môi trường phát triển (dùng SQLite thay Supabase do môi trường build
   không có quyền truy cập mạng ra ngoài internet). Khi chạy trên máy bạn với
   Supabase thật, **không cần sửa gì thêm** — chỉ cần `pip install` + `npm install`
   rồi chạy như hướng dẫn trên.
-- Nếu bảng chưa được tạo tự động (ví dụ do firewall/mạng), có thể chủ động chạy:
+- Có thể chủ động tạo bảng (không seed dữ liệu) bằng:
   ```bash
-  cd backend/src && python3 -c "from infrastructure.databases import init_db; init_db()"
+  cd backend/src && DB_INIT_ON_STARTUP=true python3 -c "from infrastructure.databases import init_db; init_db()"
   ```
+- Chỉ bật `DB_SEED_ON_INIT=true` khi thực sự muốn thêm tài khoản demo vào
+  database đã kết nối.
 - Cột `interval_minutes` khi "Compute features" quyết định độ chi tiết của
   time-series (tương ứng RQ2 trong đề cương — ảnh hưởng đến độ chính xác dự báo).
+  Mặc định giao diện dùng **1 phút** để các file dữ liệu ngắn (như các mẫu
+  08:30–09:00 và 09:30–10:00) có đủ điểm cho cửa sổ train/test. Nếu đã tính
+  features ở 15 phút hoặc lớn hơn, hãy chạy lại "Compute features" với
+  `1 phút` trước khi chạy ARIMA/Prophet.
 - Model dự báo: **ARIMA** (statsmodels, order mặc định `(2,1,2)`, có fallback về
   moving-average nếu không hội tụ) và **Prophet** (tuỳ chọn, tự động fallback về
   ARIMA nếu chưa cài `prophet`).
