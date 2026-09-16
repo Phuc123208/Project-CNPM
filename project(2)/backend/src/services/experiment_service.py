@@ -43,7 +43,13 @@ class ExperimentService:
                 for f in result["forecast"]
             ]
             self.repository.save_forecast_results(forecast_rows)
-            self.repository.update_status(experiment_id, "completed", result["metrics"])
+            evaluation_metrics = {
+                **result["metrics"],
+                "_test_actual": result["test_actual"],
+                "_test_predicted": result["test_predicted"],
+                "_test_index": result["test_index"],
+            }
+            self.repository.update_status(experiment_id, "completed", evaluation_metrics)
             result["experiment_id"] = experiment_id
             result["segment_id"] = segment_id
             return result
