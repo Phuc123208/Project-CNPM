@@ -42,6 +42,8 @@ class ReportService:
             ws.title = "KPIs"
             ws.append(["Metric", "Value"])
             for k, v in kpis.items():
+                if k.startswith("_"):
+                    continue
                 ws.append([k, v])
             ws2 = wb.create_sheet("Hotspots")
             ws2.append(["segment_id", "avg_density", "avg_speed", "total_vehicle_count"])
@@ -91,13 +93,18 @@ class ReportService:
                            f.lower_bound, f.upper_bound])
             ws2 = wb.create_sheet("Metrics")
             for k, v in (exp.evaluation_metrics or {}).items():
+                if k.startswith("_"):
+                    continue
                 ws2.append([k, v])
             wb.save(path)
         else:
             fmt = "pdf"
             path, filename = self._new_path("forecast_report", "pdf")
             self._render_pdf(path, f"Forecast Report - {exp.name} ({exp.model_type.upper()})", [
-                ("Evaluation Metrics", [[k, str(v)] for k, v in (exp.evaluation_metrics or {}).items()]),
+                ("Evaluation Metrics", [
+                    [k, str(v)] for k, v in (exp.evaluation_metrics or {}).items()
+                    if not k.startswith("_")
+                ]),
                 ("Forecast Results",
                  [["Time", "Segment", "Predicted Density", "Lower", "Upper"]] +
                  [[str(f.forecast_time), f.segment_id, round(f.predicted_density or 0, 2),
