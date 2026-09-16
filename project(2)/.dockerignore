@@ -1,0 +1,10 @@
+.git/
+.gitignore
+frontend/node_modules/
+frontend/dist/
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/.env
+frontend/.env
+frontend/.env.*
+Project-CNPM-*.zip
