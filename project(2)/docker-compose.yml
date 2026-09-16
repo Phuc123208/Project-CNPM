@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: urban_traffic
+      POSTGRES_USER: urban_traffic
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-urban_traffic_dev_only}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urban_traffic -d urban_traffic"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URI: postgresql+psycopg2://urban_traffic:${POSTGRES_PASSWORD:-urban_traffic_dev_only}@db:5432/urban_traffic
+      SECRET_KEY: ${SECRET_KEY:-change-this-local-secret}
+      FLASK_ENV: production
+      DEBUG: "false"
+      DB_INIT_ON_STARTUP: "true"
+      DB_SEED_ON_INIT: "true"
+      UPLOAD_FOLDER: /app/src/uploads
+      REPORT_FOLDER: /app/src/static/reports
+    volumes:
+      - backend_uploads:/app/src/uploads
+      - backend_reports:/app/src/static/reports
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:9999/api/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  backend_uploads:
+  backend_reports:
