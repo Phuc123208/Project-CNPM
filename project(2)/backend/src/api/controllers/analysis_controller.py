@@ -21,7 +21,7 @@ def compute_features(version_id):
     """Module 2: build the traffic-density time series (vehicle count, avg
     speed, density, peak-hour flag) from raw trajectories."""
     data = request.get_json(force=True, silent=True) or {}
-    interval = int(data.get("interval_minutes", 15))
+    interval = int(data.get("interval_minutes", 1))
     try:
         result = analysis_service.compute_features(version_id, interval_minutes=interval)
         audit_service.log(g.current_user["user_id"], "compute_traffic_features",
