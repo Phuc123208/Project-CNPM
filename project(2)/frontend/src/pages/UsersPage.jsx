@@ -18,7 +18,15 @@ export default function UsersPage() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    client.get("/users").then((res) => {
+      if (active) setUsers(res.data.data);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
 
   const createUser = async (e) => {
     e.preventDefault();
