@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import Loading from "../components/Loading";
 import StatusBadge from "../components/StatusBadge";
 
@@ -36,7 +36,21 @@ export default function DatasetDetailPage() {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [datasetId]);
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      client.get(`/datasets/${datasetId}`),
+      client.get(`/datasets/${datasetId}/versions`),
+    ]).then(([dsRes, vRes]) => {
+      if (!active) return;
+      setDataset(dsRes.data.data);
+      setVersions(vRes.data.data);
+      setActiveVersion(vRes.data.data[0] || null);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [datasetId]);
 
   const openPreview = async (v) => {
     setActiveVersion(v);
