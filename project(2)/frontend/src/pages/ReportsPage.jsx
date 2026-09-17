@@ -8,15 +8,15 @@ export default function ReportsPage() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await client.get("/reports");
-      setReports(res.data.data);
-    } finally { setLoading(false); }
-  };
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    client.get("/reports").then((res) => {
+      if (active) setReports(res.data.data);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
 
   const download = async (report) => {
     const token = localStorage.getItem("utap_token");
