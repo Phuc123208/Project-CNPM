@@ -4,12 +4,26 @@ import {
   ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import Loading from "../components/Loading";
 import StatusBadge from "../components/StatusBadge";
 import KpiCard from "../components/KpiCard";
 
 const CAN_RUN = ["admin", "researcher", "analyst"];
+
+function storedResult(experiment, forecasts) {
+  const metrics = experiment.evaluation_metrics || {};
+  return {
+    test_actual: metrics._test_actual || [],
+    test_predicted: metrics._test_predicted || [],
+    test_index: metrics._test_index || [],
+    forecast: forecasts.map((r) => ({
+      timestamp: r.forecast_time, predicted_density: r.predicted_density,
+      lower_bound: r.lower_bound, upper_bound: r.upper_bound,
+    })),
+    metrics,
+  };
+}
 
 export default function ExperimentDetailPage() {
   const { experimentId } = useParams();
@@ -38,20 +52,35 @@ export default function ExperimentDetailPage() {
 
       const resultsRes = await client.get(`/experiments/${experimentId}/results`);
       if (resultsRes.data.data.length) {
-        setResult({
-          forecast: resultsRes.data.data.map((r) => ({
-            timestamp: r.forecast_time, predicted_density: r.predicted_density,
-            lower_bound: r.lower_bound, upper_bound: r.upper_bound,
-          })),
-          metrics: res.data.data.evaluation_metrics,
-        });
+        setResult(storedResult(res.data.data, resultsRes.data.data));
       }
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [experimentId]);
+  useEffect(() => {
+    let active = true;
+    const fetchExperiment = async () => {
+      const res = await client.get(`/experiments/${experimentId}`);
+      if (!active) return;
+      setExperiment(res.data.data);
+      const hs = await client.get(`/analysis/versions/${res.data.data.version_id}/hotspots`, { params: { top_n: 50 } });
+      if (!active) return;
+      const segs = hs.data.data.map((h) => h.segment_id);
+      setSegments(segs);
+      if (segs.length) setForm((f) => ({ ...f, segment_id: segs[0] }));
+      const resultsRes = await client.get(`/experiments/${experimentId}/results`);
+      if (!active) return;
+      if (resultsRes.data.data.length) {
+        setResult(storedResult(res.data.data, resultsRes.data.data));
+      }
+    };
+    fetchExperiment().finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [experimentId]);
 
   const runForecast = async (e) => {
     e.preventDefault();
