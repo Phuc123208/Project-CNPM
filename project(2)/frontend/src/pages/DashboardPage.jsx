@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import KpiCard from "../components/KpiCard";
 import Loading from "../components/Loading";
 import StatusBadge from "../components/StatusBadge";
