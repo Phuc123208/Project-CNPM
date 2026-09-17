@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import Loading from "../components/Loading";
 import StatusBadge from "../components/StatusBadge";
 
@@ -19,6 +19,10 @@ export default function ExperimentsPage() {
   const [form, setForm] = useState({ dataset_id: "", version_id: "", name: "", model_type: "arima" });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [compareIds, setCompareIds] = useState(["", ""]);
+  const [comparison, setComparison] = useState(null);
+  const [compareBusy, setCompareBusy] = useState(false);
+  const [compareError, setCompareError] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -29,15 +33,21 @@ export default function ExperimentsPage() {
   };
 
   useEffect(() => {
-    load();
-    client.get("/datasets").then((res) => setDatasets(res.data.data));
+    let active = true;
+    client.get("/experiments").then((res) => {
+      if (active) setExperiments(res.data.data);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    client.get("/datasets").then((res) => {
+      if (active) setDatasets(res.data.data);
+    });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
     if (form.dataset_id) {
       client.get(`/datasets/${form.dataset_id}/versions`).then((res) => setVersions(res.data.data));
-    } else {
-      setVersions([]);
     }
   }, [form.dataset_id]);
 
@@ -55,6 +65,24 @@ export default function ExperimentsPage() {
       setError(err?.response?.data?.message || "Could not create experiment");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const compare = async (e) => {
+    e.preventDefault();
+    if (!compareIds[0] || !compareIds[1] || compareIds[0] === compareIds[1]) {
+      setCompareError("Select two different experiments.");
+      return;
+    }
+    setCompareBusy(true);
+    setCompareError("");
+    try {
+      const res = await client.get(`/experiments/compare?ids=${compareIds.join(",")}`);
+      setComparison(res.data.data);
+    } catch (err) {
+      setCompareError(err?.response?.data?.message || "Could not compare experiments");
+    } finally {
+      setCompareBusy(false);
     }
   };
 
@@ -81,10 +109,63 @@ export default function ExperimentsPage() {
             <div className="grid grid-3">
               <div className="form-field">
                 <label>Dataset</label>
-                <select required value={form.dataset_id} onChange={(e) => setForm({ ...form, dataset_id: e.target.value, version_id: "" })}>
+                <select required value={form.dataset_id} onChange={(e) => {
+                  setForm({ ...form, dataset_id: e.target.value, version_id: "" });
+                  setVersions([]);
+                }}>
                   <option value="">Select…</option>
                   {datasets.map((d) => <option key={d.dataset_id} value={d.dataset_id}>{d.name}</option>)}
                 </select>
+              </div>
+
+              <div className="card" style={{ marginTop: 20 }}>
+                <h3>Compare experiments</h3>
+                <p className="subtitle">Compare completed ARIMA and Prophet runs on the same dataset version.</p>
+                {compareError && <div className="alert alert-error">{compareError}</div>}
+                <form onSubmit={compare} className="grid grid-3">
+                  {[0, 1].map((index) => (
+                    <div className="form-field" key={index}>
+                      <label>Experiment {index + 1}</label>
+                      <select
+                        value={compareIds[index]}
+                        onChange={(e) => {
+                          const next = [...compareIds];
+                          next[index] = e.target.value;
+                          setCompareIds(next);
+                        }}
+                      >
+                        <option value="">Select completed experiment…</option>
+                        {experiments.filter((item) => item.status === "completed").map((item) => (
+                          <option key={item.experiment_id} value={item.experiment_id}>
+                            {item.model_type.toUpperCase()} — {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", alignItems: "flex-end" }}>
+                    <button className="btn btn-secondary" disabled={compareBusy}>
+                      {compareBusy ? "Comparing…" : "Compare"}
+                    </button>
+                  </div>
+                </form>
+                {comparison && (
+                  <table style={{ marginTop: 16 }}>
+                    <thead><tr><th>Experiment</th><th>Model</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>R²</th></tr></thead>
+                    <tbody>
+                      {comparison.map((item) => (
+                        <tr key={item.experiment_id}>
+                          <td>{item.name}</td>
+                          <td className="mono">{item.model_type.toUpperCase()}</td>
+                          <td>{item.evaluation_metrics?.MAE ?? "—"}</td>
+                          <td>{item.evaluation_metrics?.RMSE ?? "—"}</td>
+                          <td>{item.evaluation_metrics?.MAPE ?? "—"}</td>
+                          <td>{item.evaluation_metrics?.R2 ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
               <div className="form-field">
                 <label>Dataset version</label>
