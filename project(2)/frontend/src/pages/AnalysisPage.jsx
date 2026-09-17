@@ -5,7 +5,7 @@ import {
   BarChart, Bar, Legend, Cell,
 } from "recharts";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import KpiCard from "../components/KpiCard";
 import Loading from "../components/Loading";
 
@@ -20,7 +20,7 @@ export default function AnalysisPage() {
   const [versions, setVersions] = useState([]);
   const [datasetId, setDatasetId] = useState("");
   const [versionId, setVersionId] = useState(params.get("version_id") || "");
-  const [interval, setInterval_] = useState(15);
+  const [interval, setInterval_] = useState(1);
   const [segmentFilter, setSegmentFilter] = useState("");
 
   const [kpis, setKpis] = useState(null);
@@ -52,7 +52,11 @@ export default function AnalysisPage() {
     if (!datasetId) return;
     client.get(`/datasets/${datasetId}/versions`).then((res) => {
       setVersions(res.data.data);
-      if (!versionId && res.data.data.length) setVersionId(String(res.data.data[0].version_id));
+      if (!versionId && res.data.data.length) {
+        const nextVersionId = String(res.data.data[0].version_id);
+        setVersionId(nextVersionId);
+        setParams({ version_id: nextVersionId });
+      }
     });
     // eslint-disable-next-line
   }, [datasetId]);
@@ -89,8 +93,7 @@ export default function AnalysisPage() {
 
   useEffect(() => {
     if (versionId) {
-      setParams({ version_id: versionId });
-      loadAll(versionId, segmentFilter);
+      Promise.resolve().then(() => loadAll(versionId, segmentFilter));
     }
     // eslint-disable-next-line
   }, [versionId]);
@@ -139,14 +142,21 @@ export default function AnalysisPage() {
         <div className="grid grid-4">
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label>Dataset</label>
-            <select value={datasetId} onChange={(e) => { setDatasetId(e.target.value); setVersionId(""); }}>
+            <select value={datasetId} onChange={(e) => {
+              setDatasetId(e.target.value);
+              setVersionId("");
+              setParams({});
+            }}>
               <option value="">Select dataset…</option>
               {datasets.map((d) => <option key={d.dataset_id} value={d.dataset_id}>{d.name}</option>)}
             </select>
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label>Version</label>
-            <select value={versionId} onChange={(e) => setVersionId(e.target.value)} disabled={!versions.length}>
+            <select value={versionId} onChange={(e) => {
+              setVersionId(e.target.value);
+              setParams(e.target.value ? { version_id: e.target.value } : {});
+            }} disabled={!versions.length}>
               <option value="">Select version…</option>
               {versions.map((v) => <option key={v.version_id} value={v.version_id}>{v.version_number} ({v.row_count} rows)</option>)}
             </select>
@@ -155,6 +165,7 @@ export default function AnalysisPage() {
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>Aggregation interval (min)</label>
               <select value={interval} onChange={(e) => setInterval_(e.target.value)}>
+                <option value={1}>1</option>
                 <option value={5}>5</option>
                 <option value={15}>15</option>
                 <option value={30}>30</option>
