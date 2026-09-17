@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import Loading from "../components/Loading";
 import StatusBadge from "../components/StatusBadge";
 
@@ -30,7 +30,15 @@ export default function DatasetsPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    client.get("/datasets").then((res) => {
+      if (active) setDatasets(res.data.data);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
 
   const handleUpload = async (e) => {
     e.preventDefault();
